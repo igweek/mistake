@@ -24,7 +24,7 @@ export interface Mistake {
   user_id?: string;
 }
 
-export type ViewState = 'dashboard' | 'add' | 'settings' | 'trash';
+export type ViewState = 'dashboard' | 'add' | 'settings' | 'trash' | 'archive';
 
 export interface SupabaseSettings {
   url: string;
