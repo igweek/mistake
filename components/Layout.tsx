@@ -17,10 +17,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeV
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#F8FAFC]">
-      {/* Sidebar - Soft Blue Minimalist */}
-      <nav className="md:w-60 md:h-screen md:sticky md:top-0 p-6 flex flex-col z-30 flex-shrink-0 border-r border-slate-100 bg-white">
+      {/* Sidebar - Desktop Only */}
+      <nav className="hidden md:flex md:w-60 md:h-screen md:sticky md:top-0 p-6 flex-col z-30 flex-shrink-0 border-r border-slate-100 bg-white">
         <div className="flex flex-col h-full">
-          
           {/* Brand */}
           <div className="mb-12 px-2">
              <div className="flex items-center gap-2.5 mb-1.5">
@@ -73,18 +72,42 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeV
       </nav>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto p-6 md:p-12 w-full">
-        <div className="max-w-6xl mx-auto min-h-full flex flex-col">
+      <main className={`flex-1 overflow-y-auto w-full ${currentView === 'add' ? 'p-0' : 'p-6 md:p-12 pb-24 md:pb-12'}`}>
+        <div className={`${currentView === 'add' ? 'w-full h-full' : 'max-w-6xl mx-auto min-h-full flex flex-col'}`}>
             {children}
         </div>
       </main>
 
-      {/* Mobile Nav */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/80 border-t border-slate-100 z-50 px-8 py-3 flex justify-between items-center backdrop-blur-xl">
-          <MobileNavButton active={currentView === 'dashboard'} onClick={() => onChangeView('dashboard')} icon={<Grid size={22} />} />
-          <button onClick={() => onChangeView('add')} className="bg-blue-600 text-white p-3.5 rounded-2xl shadow-lg -mt-12 border-4 border-[#F8FAFC] active:scale-95 transition-transform"><Plus size={24} /></button>
-          <MobileNavButton active={currentView === 'trash'} onClick={() => onChangeView('trash')} icon={<Trash2 size={22} />} />
-          <MobileNavButton active={currentView === 'settings'} onClick={() => onChangeView('settings')} icon={<Settings size={22} />} />
+      {/* Mobile Nav - Refined & Minimalist */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-6 pb-[env(safe-area-inset-bottom,16px)] pt-3 bg-white/80 backdrop-blur-xl border-t border-slate-100 flex justify-around items-center">
+          <MobileNavButton 
+            active={currentView === 'dashboard'} 
+            onClick={() => onChangeView('dashboard')} 
+            icon={<Grid size={20} />} 
+            label="集"
+          />
+          <MobileNavButton 
+            active={currentView === 'trash'} 
+            onClick={() => onChangeView('trash')} 
+            icon={<Trash2 size={20} />} 
+            label="收"
+          />
+          
+          {/* Integrated Plus Button - Less Obtrusive */}
+          <button 
+            onClick={() => onChangeView('add')} 
+            className={`flex flex-col items-center justify-center -mt-8 w-14 h-14 rounded-2xl shadow-xl transition-all active:scale-90 ${currentView === 'add' ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'}`}
+          >
+            <Plus size={28} />
+          </button>
+
+          <MobileNavButton 
+            active={currentView === 'settings'} 
+            onClick={() => onChangeView('settings')} 
+            icon={<Settings size={20} />} 
+            label="设"
+          />
+          <div className="w-10"></div> {/* Spacer to balance items if needed, or remove for even spread */}
       </div>
     </div>
   );
@@ -104,6 +127,9 @@ const NavButton: React.FC<{ active: boolean; onClick: () => void; icon: React.Re
   </button>
 );
 
-const MobileNavButton: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode }> = ({ active, onClick, icon }) => (
-    <button onClick={onClick} className={`p-2 transition-colors ${active ? 'text-blue-600' : 'text-slate-300'}`}>{icon}</button>
+const MobileNavButton: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; label: string }> = ({ active, onClick, icon, label }) => (
+    <button onClick={onClick} className={`flex flex-col items-center gap-0.5 p-2 transition-all ${active ? 'text-blue-600' : 'text-slate-300'}`}>
+        {icon}
+        <span className="text-[10px] font-bold">{label}</span>
+    </button>
 );
