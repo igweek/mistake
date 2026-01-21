@@ -3,7 +3,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>错题本 AI - 智能复习助手</title>
     
     <!-- PWA & Mobile Meta -->
@@ -30,6 +30,7 @@
         color: #1E293B;
         -webkit-font-smoothing: antialiased;
         overscroll-behavior-y: contain; /* Prevents pull-to-refresh on mobile */
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
       }
       
       .font-serif-content {
@@ -71,6 +72,15 @@
       button, a {
         touch-action: manipulation;
       }
+
+      /* Fix ReactCrop handles for mobile touch */
+      .ReactCrop__drag-handle {
+        width: 14px !important;
+        height: 14px !important;
+        background-color: #2563eb !important;
+        border: 2px solid white !important;
+        border-radius: 50% !important;
+      }
     </style>
     <script>
       window.global = window;
@@ -96,7 +106,6 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <div id="root"></div>
