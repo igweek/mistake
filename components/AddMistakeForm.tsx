@@ -1,9 +1,9 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
 import { Subject, Mistake } from '../types';
 import { Button } from './Button';
-import { Camera, X, Loader2, Crop as CropIcon, Plus, ArrowLeft, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Camera, X, Loader2, Crop as CropIcon, Plus, ArrowLeft, Trash2, Check, ChevronDown, ChevronUp, Save } from 'lucide-react';
 import { translations } from '../utils/translations';
 
 interface AddMistakeFormProps {
@@ -81,12 +81,23 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
   
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
-  const [showSettings, setShowSettings] = useState(false); // Mobile: Toggle for settings
+  const [showSettings, setShowSettings] = useState(false); 
   
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const imgRef = useRef<HTMLImageElement>(null);
   const [hasNewImage, setHasNewImage] = useState(false);
+
+  const [viewportHeight, setViewportHeight] = useState('100vh');
+
+  useLayoutEffect(() => {
+    const updateHeight = () => {
+      setViewportHeight(`${window.innerHeight}px`);
+    };
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    return () => window.removeEventListener('resize', updateHeight);
+  }, []);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -162,58 +173,107 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
     }
   };
 
+  // ---------------- UI Helpers ----------------
+  // Mobile Header Action Button Logic
+  const renderMobileHeaderRight = () => {
+      if (isProcessingImage) return <Loader2 size={20} className="animate-spin text-blue-600" />;
+      
+      // Case 1: Cropping Mode -> Show Checkmark to confirm crop
+      if (isCropping) {
+          return (
+              <button onClick={handleApplyCrop} className="p-2 bg-blue-600 text-white rounded-full shadow-md animate-in zoom-in">
+                  <Check size={20} />
+              </button>
+          );
+      }
+      
+      // Case 2: Preview Mode (Has Image) -> Show Checkmark/Save to submit form
+      if (imagePreview) {
+          return (
+              <button onClick={handleSaveInternal} className="p-2 bg-blue-600 text-white rounded-full shadow-md animate-in zoom-in">
+                  <Save size={20} />
+              </button>
+          );
+      }
+
+      // Case 3: No Image -> No right action (or maybe settings toggle)
+      return (
+        <button 
+            onClick={() => setShowSettings(!showSettings)} 
+            className={`p-2 transition-colors ${showSettings ? 'text-blue-600' : 'text-slate-400'}`}
+        >
+            {showSettings ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+        </button>
+      );
+  };
+
+  const renderMobileHeaderLeft = () => {
+      if (isCropping) {
+          return (
+              <button onClick={() => setIsCropping(false)} className="p-2 text-slate-500">
+                  <ArrowLeft size={24} />
+              </button>
+          );
+      }
+      return (
+          <button onClick={onCancel} className="p-2 text-slate-400">
+              <X size={24} />
+          </button>
+      );
+  };
+
   return (
-    <div className="fixed inset-0 z-[60] bg-white flex flex-col overflow-hidden animate-soft">
-        {/* Header - Simple & Clean */}
-        <div className="h-16 border-b border-slate-100 flex items-center justify-between px-6 shrink-0 bg-white z-50">
-            <button onClick={onCancel} disabled={isProcessingImage} className="text-slate-400 hover:text-blue-600 transition-colors p-2">
-              <ArrowLeft size={22} />
-            </button>
-            <div className="flex flex-col items-center text-center">
-                <h1 className="text-xs font-extrabold text-slate-800 tracking-tight uppercase">{initialData ? "修改题目" : "录入错题"}</h1>
-                <span className="text-[9px] font-bold text-blue-500 uppercase tracking-widest">{semester}</span>
+    <div 
+        className="fixed inset-0 z-[60] bg-white flex flex-col w-full overflow-hidden animate-soft"
+        style={{ height: viewportHeight }}
+    >
+        {/* ============ Header ============ */}
+        <div className="shrink-0 h-16 border-b border-slate-100 flex items-center justify-between px-4 bg-white z-[70] shadow-sm md:shadow-none">
+            {/* Left Action */}
+            <div className="flex w-16 justify-start">
+                {renderMobileHeaderLeft()}
             </div>
-            <button 
-              onClick={() => setShowSettings(!showSettings)} 
-              className={`md:hidden p-2 transition-colors ${showSettings ? 'text-blue-600' : 'text-slate-400'}`}
-            >
-              {showSettings ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-            </button>
-            <div className="hidden md:block w-10"></div>
+
+            {/* Title */}
+            <div className="flex flex-col items-center text-center">
+                <h1 className="text-sm font-extrabold text-slate-800 tracking-tight uppercase">
+                    {isCropping ? "裁剪图片" : (initialData ? "修改错题" : "录入错题")}
+                </h1>
+                {!isCropping && <span className="text-[9px] font-bold text-blue-500 uppercase tracking-widest">{semester}</span>}
+            </div>
+
+            {/* Right Action (Mobile Primary Actions moved here!) */}
+            <div className="flex w-16 justify-end">
+                {renderMobileHeaderRight()}
+            </div>
         </div>
 
-        <div className="flex-1 flex flex-col md:flex-row min-h-0 relative">
-            {/* Settings Overlay / Sidebar */}
+        {/* ============ Body ============ */}
+        <div className="flex-1 flex md:flex-row relative w-full overflow-hidden min-h-0">
+            
+            {/* Sidebar (PC) / Settings Overlay (Mobile) */}
             <div className={`
-              w-full md:w-80 bg-white z-40 md:z-auto border-r border-slate-100 shrink-0 overflow-y-auto transition-all duration-300
+              w-full md:w-80 bg-white z-[80] md:z-auto border-r border-slate-100 shrink-0 overflow-y-auto transition-all duration-300
               ${showSettings ? 'absolute inset-0 md:relative' : 'hidden md:block'}
-              ${isCropping ? 'md:opacity-40 pointer-events-none md:pointer-events-auto' : ''}
             `}>
-                <div className="p-6 space-y-8">
+                <div className="p-6 space-y-8 pb-32">
+                    {/* Settings Form Content */}
                     <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-3 tracking-widest">所属学期</label>
-                        <input 
-                            type="text" 
-                            value={semester} 
-                            onChange={(e) => setSemester(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-100 rounded-xl text-xs py-3.5 px-4 font-semibold text-slate-600 outline-none focus:ring-1 focus:ring-blue-100" 
-                        />
+                        <input type="text" value={semester} onChange={(e) => setSemester(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-100 rounded-xl text-xs py-3.5 px-4 font-semibold text-slate-600 outline-none focus:ring-1 focus:ring-blue-100" />
                     </div>
-
                     <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-3 tracking-widest">对应科目</label>
                         <div className="grid grid-cols-3 md:grid-cols-2 gap-2">
                             {Object.values(Subject).map((s) => (
                                 <button key={s} type="button" onClick={() => setSubject(s)}
-                                    className={`px-2 py-3 text-[10px] font-bold rounded-xl border transition-all ${
-                                        subject === s ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400'
-                                    }`}>
+                                    className={`px-2 py-3 text-[10px] font-bold rounded-xl border transition-all ${subject === s ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400'}`}>
                                     {t[`subj_${s}`] || s}
                                 </button>
                             ))}
                         </div>
                     </div>
-
                     <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-3 tracking-widest">知识点标签</label>
                         <div className="flex gap-2">
@@ -230,42 +290,77 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
                             ))}
                         </div>
                     </div>
-                    
                     {showSettings && (
-                        <Button fullWidth onClick={() => setShowSettings(false)} className="md:hidden h-14 rounded-2xl">确 认 设 置</Button>
+                        <div className="pt-4">
+                            <Button fullWidth onClick={() => setShowSettings(false)} className="md:hidden h-14 rounded-2xl">确 认 设 置</Button>
+                        </div>
                     )}
                 </div>
             </div>
 
-            {/* Main Image Area */}
-            <div className="flex-1 flex flex-col min-h-0 bg-slate-50/50 relative">
-                <div className="flex-1 w-full flex items-center justify-center p-4 overflow-hidden relative">
+            {/* Right Main Content */}
+            <div className="flex-1 w-full h-full bg-slate-50/50 relative flex flex-col min-h-0 overflow-hidden">
+                
+                {/* Image Area - Flex 1 to take all available space */}
+                <div className="flex-1 w-full h-full relative overflow-hidden flex items-center justify-center p-4">
                     {!imagePreview && (
-                        <label className="group flex flex-col items-center justify-center w-full max-w-sm aspect-square border-2 border-dashed border-slate-200 rounded-[2.5rem] bg-white hover:border-blue-400 cursor-pointer transition-all shadow-xl z-10 mx-4">
-                            <input type="file" className="hidden" accept="image/*" capture="environment" onChange={handleImageUpload} />
-                            <div className="w-20 h-20 bg-blue-50 text-blue-500 rounded-3xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                              <Camera size={40} />
-                            </div>
-                            <span className="text-[14px] font-bold text-slate-600 tracking-tight">点击拍照或上传</span>
-                            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest mt-1">Automatic WebP Compression</span>
-                        </label>
+                        <div className="flex flex-col items-center justify-center w-full h-full animate-in fade-in zoom-in duration-300">
+                            <label className="group flex flex-col items-center justify-center w-full max-w-sm aspect-square border-2 border-dashed border-slate-200 rounded-[2.5rem] bg-white hover:border-blue-400 cursor-pointer transition-all shadow-xl z-10 mx-4 active:scale-95">
+                                <input type="file" className="hidden" accept="image/*" capture="environment" onChange={handleImageUpload} />
+                                <div className="w-20 h-20 bg-blue-50 text-blue-500 rounded-3xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                                <Camera size={40} />
+                                </div>
+                                <span className="text-[14px] font-bold text-slate-600 tracking-tight">点击拍照或上传</span>
+                                <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest mt-1">Automatic WebP Compression</span>
+                            </label>
+                        </div>
                     )}
 
                     {imagePreview && (
-                        <div className={`w-full h-full flex items-center justify-center relative ${isCropping ? 'touch-none' : ''}`}>
+                        // 关键修复：width/height full + object-contain 确保图片完全展示在区域内，不会溢出
+                        <div className={`relative w-full h-full flex items-center justify-center ${isCropping ? 'touch-none' : ''}`}>
                             {isCropping ? (
-                                <ReactCrop crop={crop} onChange={c => setCrop(c)} onComplete={c => setCompletedCrop(c)} className="max-h-full">
+                                <ReactCrop 
+                                    crop={crop} 
+                                    onChange={c => setCrop(c)} 
+                                    onComplete={c => setCompletedCrop(c)} 
+                                    className="max-h-full"
+                                    style={{ maxHeight: '100%' }} // Ensure crop container respects parent height
+                                >
                                     <img 
                                         ref={imgRef} 
                                         src={imagePreview} 
-                                        style={{ maxHeight: 'calc(100vh - 220px)', maxWidth: '100vw' }} 
+                                        // PC/Mobile 通用：限制图片最大高度为父容器高度，最大宽度为100%
+                                        style={{ maxHeight: 'calc(100vh - 8rem)', maxWidth: '100%', objectFit: 'contain' }} 
                                         onLoad={(e) => setCrop(centerAspectCrop(e.currentTarget.width, e.currentTarget.height, 1))} 
                                         alt="Crop" 
                                     />
                                 </ReactCrop>
                             ) : (
-                                <img src={imagePreview} className="max-h-full max-w-full object-contain rounded-2xl shadow-2xl border-4 border-white" alt="Preview" />
+                                <img 
+                                    src={imagePreview} 
+                                    className="max-h-full max-w-full object-contain rounded-xl shadow-lg border-2 border-white" 
+                                    alt="Preview" 
+                                />
                             )}
+                        </div>
+                    )}
+
+                    {/* Mobile Floating Tools (Only show on Mobile & when not cropping & when image exists) */}
+                    {imagePreview && !isCropping && (
+                        <div className="md:hidden absolute bottom-6 left-0 right-0 flex justify-center gap-6 z-10">
+                             <button 
+                                onClick={() => { setImagePreview(null); setHasNewImage(false); }} 
+                                className="p-3 bg-white/90 backdrop-blur rounded-full text-red-400 shadow-lg border border-red-50"
+                             >
+                                 <Trash2 size={20} />
+                             </button>
+                             <button 
+                                onClick={() => setIsCropping(true)} 
+                                className="p-3 bg-white/90 backdrop-blur rounded-full text-blue-600 shadow-lg border border-blue-50"
+                             >
+                                 <CropIcon size={20} />
+                             </button>
                         </div>
                     )}
 
@@ -277,18 +372,19 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
                     )}
                 </div>
 
-                {/* Bottom Action Bar */}
+                {/* ============ Footer (Desktop Only) ============ */}
+                {/* 移动端因为有了顶部操作栏，这里直接隐藏，避免任何遮挡问题 */}
                 {imagePreview && (
-                    <div className="w-full bg-white/80 backdrop-blur-md border-t border-slate-100 p-4 md:p-8 z-20 pb-[env(safe-area-inset-bottom,24px)]">
+                    <div className="hidden md:block shrink-0 w-full bg-white border-t border-slate-100 p-6 z-[50]">
                         <div className="max-w-xl mx-auto flex items-center justify-between gap-6">
                             {isCropping ? (
                                 <>
                                     <button onClick={() => setIsCropping(false)} className="flex-1 py-4 text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors">取消</button>
-                                    <Button onClick={handleApplyCrop} className="flex-[3] h-14 rounded-2xl font-bold shadow-xl shadow-blue-100">完成裁剪并生成</Button>
+                                    <Button onClick={handleApplyCrop} className="flex-[3] h-14 rounded-2xl font-bold shadow-xl shadow-blue-100 text-sm">完成裁剪并生成</Button>
                                 </>
                             ) : (
                                 <>
-                                    <button onClick={() => setIsCropping(true)} disabled={isProcessingImage} className="flex flex-col items-center gap-1 group">
+                                    <button onClick={() => setIsCropping(true)} disabled={isProcessingImage} className="flex flex-col items-center gap-1 group w-16">
                                         <div className="p-3.5 rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-all shadow-sm"><CropIcon size={22}/></div>
                                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">裁剪</span>
                                     </button>
@@ -297,7 +393,7 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
                                         保存错题
                                     </Button>
 
-                                    <button onClick={() => { setImagePreview(null); setHasNewImage(false); }} disabled={isProcessingImage} className="flex flex-col items-center gap-1 group">
+                                    <button onClick={() => { setImagePreview(null); setHasNewImage(false); }} disabled={isProcessingImage} className="flex flex-col items-center gap-1 group w-16">
                                         <div className="p-3.5 rounded-2xl bg-red-50 text-red-300 group-hover:bg-red-500 group-hover:text-white transition-all shadow-sm"><Trash2 size={22}/></div>
                                         <span className="text-[9px] font-bold text-red-300 uppercase tracking-widest mt-1">重选</span>
                                     </button>
