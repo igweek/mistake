@@ -144,9 +144,9 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
             setImagePreview(compressedWebp);
             setHasNewImage(true);
             setIsCropping(false);
-          } catch (e) {
+          } catch (e: any) {
             console.error("Crop failed", e);
-            alert("裁剪失败");
+            alert("裁剪失败: " + (e.message || "未知错误"));
           } finally {
             setIsProcessingImage(false);
           }
@@ -275,7 +275,14 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
                         <div className="w-full h-full flex items-center justify-center">
                             {isCropping ? (
                                 <ReactCrop crop={crop} onChange={c => setCrop(c)} onComplete={c => setCompletedCrop(c)} className="max-h-full">
-                                    <img ref={imgRef} src={imagePreview} style={{ maxHeight: 'calc(100vh - 280px)' }} onLoad={(e) => setCrop(centerAspectCrop(e.currentTarget.width, e.currentTarget.height, 1))} alt="Crop" />
+                                    <img 
+                                        ref={imgRef} 
+                                        src={imagePreview} 
+                                        crossOrigin="anonymous"
+                                        style={{ maxHeight: 'calc(100vh - 280px)' }} 
+                                        onLoad={(e) => setCrop(centerAspectCrop(e.currentTarget.width, e.currentTarget.height, 1))} 
+                                        alt="Crop" 
+                                    />
                                 </ReactCrop>
                             ) : (
                                 <img src={imagePreview} className="max-h-full max-w-full object-contain rounded-lg shadow-xl border-4 border-white" alt="Mistake" />
@@ -318,13 +325,33 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
 
 function getCroppedImg(image: HTMLImageElement, crop: PixelCrop): Promise<string> {
   const canvas = document.createElement('canvas');
+  // Check for invalid dimensions
+  if (!image.naturalWidth || !image.naturalHeight || !image.width || !image.height) {
+     return Promise.reject(new Error("Image dimensions invalid"));
+  }
+  
   const scaleX = image.naturalWidth / image.width;
   const scaleY = image.naturalHeight / image.height;
+  
   canvas.width = crop.width * scaleX;
   canvas.height = crop.height * scaleY;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('No 2d context');
-  ctx.drawImage(image, crop.x * scaleX, crop.y * scaleY, crop.width * scaleX, crop.height * scaleY, 0, 0, crop.width * scaleX, crop.height * scaleY);
   
-  return Promise.resolve(canvas.toDataURL('image/webp', 0.8));
+  if (canvas.width <= 0 || canvas.height <= 0) {
+      return Promise.reject(new Error("Crop dimensions invalid"));
+  }
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return Promise.reject(new Error('No 2d context'));
+  
+  // Fill white for transparency
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  try {
+      ctx.drawImage(image, crop.x * scaleX, crop.y * scaleY, crop.width * scaleX, crop.height * scaleY, 0, 0, crop.width * scaleX, crop.height * scaleY);
+      return Promise.resolve(canvas.toDataURL('image/webp', 0.8));
+  } catch (e) {
+      console.error("Canvas export failed", e);
+      return Promise.reject(e);
+  }
 }
