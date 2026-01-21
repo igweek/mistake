@@ -1,0 +1,17 @@
+
+{
+  "short_name": "错题本",
+  "name": "错题本 AI - 智能助手",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3429/3429149.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#F8FAFC",
+  "display": "standalone",
+  "theme_color": "#2563eb",
+  "description": "收集错题，智能解析，助力学习复习。"
+}

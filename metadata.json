@@ -1,0 +1,5 @@
+{
+  "name": "Mistake Notebook AI",
+  "description": "A smart mistake collection notebook for students. Collect wrong answers, review them, and get AI-powered explanations and solutions using Gemini.",
+  "requestFramePermissions": []
+}
