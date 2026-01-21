@@ -35,8 +35,7 @@ const optimizeImage = async (base64Str: string): Promise<string> => {
   return new Promise((resolve) => {
     const img = new Image();
     
-    // Fix: Do not set crossOrigin for data URIs as it causes issues in some browsers (tainted canvas)
-    // Only needed for external URLs
+    // 对于本地 Data URI，严禁设置 crossOrigin，否则会导致 Canvas 污染
     if (!base64Str.startsWith('data:')) {
         img.crossOrigin = "anonymous";
     }
@@ -61,19 +60,17 @@ const optimizeImage = async (base64Str: string): Promise<string> => {
             ctx.fillRect(0, 0, width, height);
             ctx.drawImage(img, 0, 0, width, height);
             
-            // Try WebP, fallback to JPEG if browser doesn't support it (e.g. older Safari)
-            let result = canvas.toDataURL('image/webp', 0.6);
+            // Try WebP, fallback to JPEG
+            let result = canvas.toDataURL('image/webp', 0.8);
             if (result.indexOf('image/webp') === -1) {
-                result = canvas.toDataURL('image/jpeg', 0.6);
+                result = canvas.toDataURL('image/jpeg', 0.8);
             }
             resolve(result);
           } else {
-            // Context failed
             resolve(base64Str);
           }
       } catch (e) {
           console.error("Image optimization error:", e);
-          // Fallback to original if compression fails
           resolve(base64Str);
       }
     };
@@ -102,7 +99,6 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const imgRef = useRef<HTMLImageElement>(null);
   
-  // Track if image was actually changed/uploaded to avoid re-compressing initialData URL
   const [hasNewImage, setHasNewImage] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,11 +106,13 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
     if (!file) return;
     setIsProcessingImage(true);
     
+    // 给 UI 一点时间渲染 Loading 状态
     setTimeout(() => {
         const reader = new FileReader();
         reader.onload = async () => {
             try {
                 const base64 = reader.result as string;
+                // 上传时先进行一次基础压缩，防止大图卡顿
                 const compressed = await optimizeImage(base64);
                 setImagePreview(compressed);
                 setHasNewImage(true);
@@ -135,11 +133,16 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
   };
 
   const handleApplyCrop = async () => {
+    // 关键修复：确保 imgRef.current 存在
+    // 这里的逻辑是：UI 显示 Loading 遮罩 -> 下一个 Event Loop 执行裁剪 -> 裁剪完毕 -> 关闭 Loading
     if (completedCrop && imgRef.current && imagePreview) {
+      const imageElement = imgRef.current; // 锁定引用
       setIsProcessingImage(true);
+      
       setTimeout(async () => {
           try {
-            const croppedBase64 = await getCroppedImg(imgRef.current!, completedCrop!);
+            // 使用锁定的引用进行裁剪
+            const croppedBase64 = await getCroppedImg(imageElement, completedCrop);
             const compressedWebp = await optimizeImage(croppedBase64);
             setImagePreview(compressedWebp);
             setHasNewImage(true);
@@ -150,7 +153,10 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
           } finally {
             setIsProcessingImage(false);
           }
-      }, 50);
+      }, 100);
+    } else {
+        // 如果没有裁剪框，直接完成
+        setIsCropping(false);
     }
   };
 
@@ -160,21 +166,16 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
         return;
     }
 
-    // Show loader immediately
     setIsProcessingImage(true);
 
-    // Yield to main thread so UI updates before heavy lifting
     setTimeout(async () => {
         try {
             let finalImageUrl = imagePreview || undefined;
-            // Only re-optimize if it's a new base64 image (starts with data:)
-            // Double check to ensure we don't block
+            // 如果是新图片，保存前再确保优化一次（虽然上传和裁剪时都做了，兜底）
             if (hasNewImage && finalImageUrl && finalImageUrl.startsWith('data:')) {
-                console.log("Optimizing image for save...");
                 finalImageUrl = await optimizeImage(finalImageUrl);
             }
             
-            console.log("Calling onSave...");
             onSave({ 
                 subject, 
                 semester: semester.trim(), 
@@ -182,7 +183,6 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
                 tags,
                 aiAnalysis: initialData?.aiAnalysis 
             }, initialData?.id);
-            // Note: onSave typically unmounts this component, so subsequent code might not run or doesn't matter.
         } catch (e) {
             console.error("Save failed:", e);
             alert("保存处理出错，请重试");
@@ -201,7 +201,7 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
 
   return (
     <div className="fixed inset-0 z-[60] bg-white flex flex-col overflow-hidden animate-soft">
-        <div className="h-16 border-b border-slate-100 flex items-center justify-between px-6 shrink-0 bg-white">
+        <div className="h-16 border-b border-slate-100 flex items-center justify-between px-6 shrink-0 bg-white z-50">
             <button onClick={onCancel} disabled={isProcessingImage} className="text-slate-400 hover:text-blue-600 transition-colors p-2"><ArrowLeft size={22} /></button>
             <div className="flex flex-col items-center text-center">
                 <h1 className="text-sm font-bold text-slate-800 tracking-tight">{initialData ? "编辑错题" : "添加错题"}</h1>
@@ -256,30 +256,30 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
                 </div>
             </div>
 
-            <div className="flex-1 flex flex-col min-h-0 bg-slate-50/50">
+            <div className="flex-1 flex flex-col min-h-0 bg-slate-50/50 relative">
                 <div className="flex-1 w-full flex items-center justify-center p-4 overflow-hidden relative">
-                    {!imagePreview && !isProcessingImage && (
-                        <label className="group flex flex-col items-center justify-center w-72 h-72 border-2 border-dashed border-slate-200 rounded-3xl bg-white hover:border-blue-400 cursor-pointer transition-all shadow-xl">
+                    
+                    {/* 上传按钮区域 */}
+                    {!imagePreview && (
+                        <label className="group flex flex-col items-center justify-center w-72 h-72 border-2 border-dashed border-slate-200 rounded-3xl bg-white hover:border-blue-400 cursor-pointer transition-all shadow-xl z-10">
                             <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
                             <Camera size={44} className="text-blue-500 mb-4" />
-                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">上传图片 (自动压缩为 WebP)</span>
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">点击拍照 / 上传图片</span>
                         </label>
                     )}
 
-                    {isProcessingImage && <div className="flex flex-col items-center gap-4">
-                        <Loader2 className="animate-spin text-blue-600" size={40} />
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">处理图片中...</span>
-                    </div>}
-
-                    {imagePreview && !isProcessingImage && (
-                        <div className="w-full h-full flex items-center justify-center">
+                    {/* 图片预览与裁剪区域 - 即使在处理中也不要卸载(Unmount) */}
+                    {imagePreview && (
+                        <div className="w-full h-full flex items-center justify-center relative">
+                             {/* 裁剪模式 */}
                             {isCropping ? (
                                 <ReactCrop crop={crop} onChange={c => setCrop(c)} onComplete={c => setCompletedCrop(c)} className="max-h-full">
                                     <img 
                                         ref={imgRef} 
                                         src={imagePreview} 
-                                        crossOrigin="anonymous"
-                                        style={{ maxHeight: 'calc(100vh - 280px)' }} 
+                                        // 本地图片不需要 crossOrigin，只有远程图片需要
+                                        // crossOrigin={imagePreview.startsWith('http') ? "anonymous" : undefined}
+                                        style={{ maxHeight: 'calc(100vh - 280px)', maxWidth: '100%' }} 
                                         onLoad={(e) => setCrop(centerAspectCrop(e.currentTarget.width, e.currentTarget.height, 1))} 
                                         alt="Crop" 
                                     />
@@ -289,26 +289,34 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
                             )}
                         </div>
                     )}
+
+                    {/* Loading 遮罩层 - 覆盖在图片上方，而不是替换图片 */}
+                    {isProcessingImage && (
+                        <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center">
+                            <Loader2 className="animate-spin text-blue-600 mb-2" size={40} />
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">处理中...</span>
+                        </div>
+                    )}
                 </div>
 
-                {imagePreview && !isProcessingImage && (
-                    <div className="w-full bg-white border-t border-slate-100 p-6 z-20">
+                {imagePreview && (
+                    <div className="w-full bg-white border-t border-slate-100 p-6 z-20 disabled:opacity-50">
                         <div className="max-w-xl mx-auto flex items-center justify-between gap-4">
                             {isCropping ? (
                                 <>
-                                    <Button variant="secondary" onClick={() => setIsCropping(false)} className="flex-1">取消</Button>
-                                    <Button onClick={handleApplyCrop} className="flex-[2]">完成裁剪并压缩</Button>
+                                    <Button variant="secondary" onClick={() => setIsCropping(false)} className="flex-1" disabled={isProcessingImage}>取消</Button>
+                                    <Button onClick={handleApplyCrop} className="flex-[2]" disabled={isProcessingImage}>完成裁剪</Button>
                                 </>
                             ) : (
                                 <>
-                                    <button onClick={() => setIsCropping(true)} className="flex flex-col items-center gap-1 p-2 group">
+                                    <button onClick={() => setIsCropping(true)} disabled={isProcessingImage} className="flex flex-col items-center gap-1 p-2 group disabled:opacity-50">
                                         <div className="p-3 rounded-xl bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-all"><CropIcon size={20}/></div>
-                                        <span className="text-[9px] font-bold text-slate-400 group-hover:text-blue-600">重新裁剪</span>
+                                        <span className="text-[9px] font-bold text-slate-400 group-hover:text-blue-600">裁剪</span>
                                     </button>
                                     <Button size="lg" onClick={handleSaveInternal} isLoading={isProcessingImage} className="flex-1 h-12 rounded-xl font-bold shadow-lg shadow-blue-100">
                                         保存错题
                                     </Button>
-                                    <button onClick={() => { setImagePreview(null); setHasNewImage(false); }} className="flex flex-col items-center gap-1 p-2 group">
+                                    <button onClick={() => { setImagePreview(null); setHasNewImage(false); }} disabled={isProcessingImage} className="flex flex-col items-center gap-1 p-2 group disabled:opacity-50">
                                         <div className="p-3 rounded-xl bg-red-50 text-red-300 group-hover:bg-red-500 group-hover:text-white transition-all"><Trash2 size={20}/></div>
                                         <span className="text-[9px] font-bold text-red-300 group-hover:text-red-500">重选</span>
                                     </button>
@@ -327,7 +335,7 @@ function getCroppedImg(image: HTMLImageElement, crop: PixelCrop): Promise<string
   const canvas = document.createElement('canvas');
   // Check for invalid dimensions
   if (!image.naturalWidth || !image.naturalHeight || !image.width || !image.height) {
-     return Promise.reject(new Error("Image dimensions invalid"));
+     return Promise.reject(new Error("Image dimensions invalid: " + image.naturalWidth));
   }
   
   const scaleX = image.naturalWidth / image.width;
@@ -337,7 +345,11 @@ function getCroppedImg(image: HTMLImageElement, crop: PixelCrop): Promise<string
   canvas.height = crop.height * scaleY;
   
   if (canvas.width <= 0 || canvas.height <= 0) {
-      return Promise.reject(new Error("Crop dimensions invalid"));
+      // 如果裁剪框异常，返回原图（或者报错）
+      // 这里为了体验，如果裁剪框极小，可能用户没选好，返回原图转base64
+      console.warn("Crop dimensions too small, using original");
+      // return Promise.resolve(image.src); 
+      return Promise.reject(new Error("裁剪区域太小"));
   }
 
   const ctx = canvas.getContext('2d');
