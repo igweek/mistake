@@ -34,38 +34,55 @@ function centerAspectCrop(mediaWidth: number, mediaHeight: number, aspect: numbe
 const optimizeImage = async (base64Str: string): Promise<string> => {
   return new Promise((resolve) => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
+    
+    // Fix: Do not set crossOrigin for data URIs as it causes issues in some browsers (tainted canvas)
+    // Only needed for external URLs
+    if (!base64Str.startsWith('data:')) {
+        img.crossOrigin = "anonymous";
+    }
+
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const MAX_WIDTH = 1280; 
-      let width = img.width;
-      let height = img.height;
+      try {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1280; 
+          let width = img.width;
+          let height = img.height;
 
-      if (width > MAX_WIDTH) {
-          height = Math.round((height * MAX_WIDTH) / width);
-          width = MAX_WIDTH;
-      }
+          if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+          }
 
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = '#FFFFFF'; 
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        let result = canvas.toDataURL('image/webp', 0.6);
-        if (result.indexOf('image/webp') === -1) {
-            result = canvas.toDataURL('image/jpeg', 0.6);
-        }
-        resolve(result);
-      } else {
-        resolve(base64Str);
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = '#FFFFFF'; 
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Try WebP, fallback to JPEG if browser doesn't support it (e.g. older Safari)
+            let result = canvas.toDataURL('image/webp', 0.6);
+            if (result.indexOf('image/webp') === -1) {
+                result = canvas.toDataURL('image/jpeg', 0.6);
+            }
+            resolve(result);
+          } else {
+            // Context failed
+            resolve(base64Str);
+          }
+      } catch (e) {
+          console.error("Image optimization error:", e);
+          // Fallback to original if compression fails
+          resolve(base64Str);
       }
     };
-    img.onerror = () => {
+
+    img.onerror = (e) => {
+        console.error("Image load failed:", e);
         resolve(base64Str);
     };
+
     img.src = base64Str;
   });
 };
@@ -93,16 +110,25 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
     if (!file) return;
     setIsProcessingImage(true);
     
-    // Slight delay to allow UI to show loader
     setTimeout(() => {
         const reader = new FileReader();
         reader.onload = async () => {
-        const base64 = reader.result as string;
-        const compressed = await optimizeImage(base64);
-        setImagePreview(compressed);
-        setHasNewImage(true);
-        setIsProcessingImage(false);
-        setIsCropping(true);
+            try {
+                const base64 = reader.result as string;
+                const compressed = await optimizeImage(base64);
+                setImagePreview(compressed);
+                setHasNewImage(true);
+                setIsCropping(true);
+            } catch (error) {
+                console.error("Upload processing failed", error);
+                alert("图片处理失败，请重试");
+            } finally {
+                setIsProcessingImage(false);
+            }
+        };
+        reader.onerror = () => {
+             setIsProcessingImage(false);
+             alert("读取文件失败");
         };
         reader.readAsDataURL(file);
     }, 50);
@@ -112,17 +138,28 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
     if (completedCrop && imgRef.current && imagePreview) {
       setIsProcessingImage(true);
       setTimeout(async () => {
-          const croppedBase64 = await getCroppedImg(imgRef.current!, completedCrop!);
-          const compressedWebp = await optimizeImage(croppedBase64);
-          setImagePreview(compressedWebp);
-          setHasNewImage(true);
-          setIsCropping(false);
-          setIsProcessingImage(false);
+          try {
+            const croppedBase64 = await getCroppedImg(imgRef.current!, completedCrop!);
+            const compressedWebp = await optimizeImage(croppedBase64);
+            setImagePreview(compressedWebp);
+            setHasNewImage(true);
+            setIsCropping(false);
+          } catch (e) {
+            console.error("Crop failed", e);
+            alert("裁剪失败");
+          } finally {
+            setIsProcessingImage(false);
+          }
       }, 50);
     }
   };
 
   const handleSaveInternal = async () => {
+    if (!subject || !semester) {
+        alert("请完善科目和学期信息");
+        return;
+    }
+
     // Show loader immediately
     setIsProcessingImage(true);
 
@@ -131,10 +168,13 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
         try {
             let finalImageUrl = imagePreview || undefined;
             // Only re-optimize if it's a new base64 image (starts with data:)
+            // Double check to ensure we don't block
             if (hasNewImage && finalImageUrl && finalImageUrl.startsWith('data:')) {
+                console.log("Optimizing image for save...");
                 finalImageUrl = await optimizeImage(finalImageUrl);
             }
             
+            console.log("Calling onSave...");
             onSave({ 
                 subject, 
                 semester: semester.trim(), 
@@ -142,12 +182,13 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
                 tags,
                 aiAnalysis: initialData?.aiAnalysis 
             }, initialData?.id);
+            // Note: onSave typically unmounts this component, so subsequent code might not run or doesn't matter.
         } catch (e) {
             console.error("Save failed:", e);
             alert("保存处理出错，请重试");
             setIsProcessingImage(false);
         }
-    }, 20);
+    }, 50);
   };
 
   const addTag = (tagName?: string) => {
