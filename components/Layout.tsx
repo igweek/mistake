@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Book, Plus, Settings, Grid, Trash2 } from 'lucide-react';
+import { Book, Plus, Settings, Grid, Trash2, Folder } from 'lucide-react';
 import { ViewState, Language } from '../types';
 import { translations } from '../utils/translations';
 
@@ -72,42 +72,49 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeV
       </nav>
 
       {/* Main Content Area */}
-      <main className={`flex-1 overflow-y-auto w-full ${currentView === 'add' ? 'p-0' : 'p-6 md:p-12 pb-24 md:pb-12'}`}>
+      <main className={`flex-1 overflow-y-auto w-full ${currentView === 'add' ? 'p-0' : 'p-4 md:p-12 pb-32 md:pb-12'}`}>
         <div className={`${currentView === 'add' ? 'w-full h-full' : 'max-w-6xl mx-auto min-h-full flex flex-col'}`}>
             {children}
         </div>
       </main>
 
-      {/* Mobile Nav - Refined & Minimalist */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-6 pb-[env(safe-area-inset-bottom,16px)] pt-3 bg-white/80 backdrop-blur-xl border-t border-slate-100 flex justify-around items-center">
+      {/* Mobile Nav - Balanced 5-Column Grid */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-[100] px-2 pb-[env(safe-area-inset-bottom,16px)] pt-2 bg-white/90 backdrop-blur-xl border-t border-slate-100 grid grid-cols-5 items-center">
           <MobileNavButton 
             active={currentView === 'dashboard'} 
             onClick={() => onChangeView('dashboard')} 
-            icon={<Grid size={20} />} 
-            label="集"
+            icon={<Grid size={22} />} 
+            label="错题"
           />
           <MobileNavButton 
             active={currentView === 'trash'} 
             onClick={() => onChangeView('trash')} 
-            icon={<Trash2 size={20} />} 
-            label="收"
+            icon={<Trash2 size={22} />} 
+            label="回收"
           />
           
-          {/* Integrated Plus Button - Less Obtrusive */}
-          <button 
-            onClick={() => onChangeView('add')} 
-            className={`flex flex-col items-center justify-center -mt-8 w-14 h-14 rounded-2xl shadow-xl transition-all active:scale-90 ${currentView === 'add' ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'}`}
-          >
-            <Plus size={28} />
-          </button>
+          {/* Integrated Add Button - Not Floating */}
+          <div className="flex justify-center -mt-2">
+            <button 
+              onClick={() => onChangeView('add')} 
+              className={`flex items-center justify-center w-12 h-12 rounded-2xl shadow-lg transition-all active:scale-95 ${currentView === 'add' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-white'}`}
+            >
+              <Plus size={26} strokeWidth={2.5} />
+            </button>
+          </div>
 
+          <MobileNavButton 
+            active={false} // Reserved for Archive/Sync
+            onClick={() => onChangeView('dashboard')} 
+            icon={<Folder size={22} />} 
+            label="存档"
+          />
           <MobileNavButton 
             active={currentView === 'settings'} 
             onClick={() => onChangeView('settings')} 
-            icon={<Settings size={20} />} 
-            label="设"
+            icon={<Settings size={22} />} 
+            label="设置"
           />
-          <div className="w-10"></div> {/* Spacer to balance items if needed, or remove for even spread */}
       </div>
     </div>
   );
@@ -128,8 +135,8 @@ const NavButton: React.FC<{ active: boolean; onClick: () => void; icon: React.Re
 );
 
 const MobileNavButton: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; label: string }> = ({ active, onClick, icon, label }) => (
-    <button onClick={onClick} className={`flex flex-col items-center gap-0.5 p-2 transition-all ${active ? 'text-blue-600' : 'text-slate-300'}`}>
+    <button onClick={onClick} className={`flex flex-col items-center justify-center gap-0.5 h-14 transition-all ${active ? 'text-blue-600' : 'text-slate-300'}`}>
         {icon}
-        <span className="text-[10px] font-bold">{label}</span>
+        <span className="text-[10px] font-bold tracking-tight">{label}</span>
     </button>
 );
