@@ -34,7 +34,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeV
           {/* Navigation */}
           <div className="flex-1 space-y-1.5">
              <NavButton 
-              active={currentView === 'dashboard'} 
+              // Active for both dashboard (recent) and archive view on Desktop since they are the same page
+              active={currentView === 'dashboard' || currentView === 'archive'} 
               onClick={() => onChangeView('dashboard')}
               icon={<Grid size={18} />}
               label={t.nav_collection}
@@ -87,10 +88,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeV
             label="错题"
           />
           <MobileNavButton 
-            active={currentView === 'trash'} 
-            onClick={() => onChangeView('trash')} 
-            icon={<Trash2 size={22} />} 
-            label="回收"
+            active={currentView === 'archive'} 
+            onClick={() => onChangeView('archive')} 
+            icon={<Folder size={22} />} 
+            label="存档"
           />
           
           {/* Integrated Add Button - Not Floating */}
@@ -104,10 +105,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeV
           </div>
 
           <MobileNavButton 
-            active={false} // Reserved for Archive/Sync
-            onClick={() => onChangeView('dashboard')} 
-            icon={<Folder size={22} />} 
-            label="存档"
+            active={currentView === 'trash'} 
+            onClick={() => onChangeView('trash')} 
+            icon={<Trash2 size={22} />} 
+            label="回收"
           />
           <MobileNavButton 
             active={currentView === 'settings'} 
