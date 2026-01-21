@@ -361,6 +361,30 @@ const App: React.FC = () => {
 
   // --- Rendering Logic ---
 
+  // Compute the "visual" view state to pass to Layout
+  // This helps Mobile nav distinguish between "Mistakes" (Recent) and "Archive" (Semesters)
+  const computedLayoutView = useMemo(() => {
+    if (view === 'dashboard') {
+        if (dashboardView === 'all') return 'dashboard';
+        return 'archive';
+    }
+    return view;
+  }, [view, dashboardView]);
+
+  const handleViewChange = (newView: ViewState) => {
+      if (newView === 'archive') {
+          setView('dashboard');
+          setDashboardView('semesters');
+          // Optional: Reset selections if navigating to top level archive
+          setSelectedSemester(null); 
+      } else if (newView === 'dashboard') {
+          setView('dashboard');
+          setDashboardView('all');
+      } else {
+          setView(newView);
+      }
+  };
+
   if (!isSettingsLoaded || authLoading) {
       return (
           <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -392,7 +416,7 @@ const App: React.FC = () => {
   const currentLanguage = settings.language || 'zh';
 
   return (
-    <Layout currentView={view} onChangeView={(v) => { setView(v); }} username={settings.username} language={currentLanguage}>
+    <Layout currentView={computedLayoutView} onChangeView={handleViewChange} username={settings.username} language={currentLanguage}>
       <div className="relative h-full flex flex-col">
         {/* Loading Indicator for Sync/Upload */}
         {(isSyncing || isBackgroundUploading) && (
