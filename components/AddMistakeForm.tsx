@@ -81,7 +81,6 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
   
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
-  const [showSettings, setShowSettings] = useState(false); 
   
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
@@ -196,15 +195,8 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
           );
       }
 
-      // Case 3: No Image -> No right action (or maybe settings toggle)
-      return (
-        <button 
-            onClick={() => setShowSettings(!showSettings)} 
-            className={`p-2 transition-colors ${showSettings ? 'text-blue-600' : 'text-slate-400'}`}
-        >
-            {showSettings ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-        </button>
-      );
+      // Case 3: No Image -> No right action
+      return null;
   };
 
   const renderMobileHeaderLeft = () => {
@@ -251,10 +243,10 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
         {/* ============ Body ============ */}
         <div className="flex-1 flex md:flex-row relative w-full overflow-hidden min-h-0">
             
-            {/* Sidebar (PC) / Settings Overlay (Mobile) */}
+            {/* Sidebar (PC) */}
             <div className={`
-              w-full md:w-80 bg-white z-[80] md:z-auto border-r border-slate-100 shrink-0 overflow-y-auto transition-all duration-300
-              ${showSettings ? 'absolute inset-0 md:relative' : 'hidden md:block'}
+              w-full md:w-80 bg-white z-[80] md:z-auto border-r border-slate-100 shrink-0 overflow-y-auto
+              hidden md:block
             `}>
                 <div className="p-6 space-y-8 pb-32">
                     {/* Settings Form Content */}
@@ -290,11 +282,6 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
                             ))}
                         </div>
                     </div>
-                    {showSettings && (
-                        <div className="pt-4">
-                            <Button fullWidth onClick={() => setShowSettings(false)} className="md:hidden h-14 rounded-2xl">确 认 设 置</Button>
-                        </div>
-                    )}
                 </div>
             </div>
 
@@ -302,9 +289,66 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
             <div className="flex-1 w-full h-full bg-slate-50/50 relative flex flex-col min-h-0 overflow-hidden">
                 
                 {/* Image Area - Flex 1 to take all available space */}
-                <div className="flex-1 w-full h-full relative overflow-hidden flex items-center justify-center p-4">
+                <div className="flex-1 w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-4">
                     {!imagePreview && (
                         <div className="flex flex-col items-center justify-center w-full h-full animate-in fade-in zoom-in duration-300">
+                            {/* 移动端：在拍摄按钮上方显示科目和tags */}
+                            <div className="md:hidden w-full max-w-sm mb-8 space-y-4">
+                                {/* 科目选择 */}
+                                <div>
+                                    <label className="block text-[9px] font-bold text-slate-400 uppercase mb-2 tracking-widest">对应科目</label>
+                                    <div className="grid grid-cols-4 gap-1.5">
+                                        {Object.values(Subject).map((s) => (
+                                            <button key={s} type="button" onClick={() => setSubject(s)}
+                                                className={`px-2 py-2 text-[8px] font-bold rounded-lg border transition-all ${subject === s ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400 text-center truncate'}`}>
+                                                {t[`subj_${s}`] || s}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Tags选择 */}
+                                <div>
+                                    <label className="block text-[9px] font-bold text-slate-400 uppercase mb-2 tracking-widest">已有标签</label>
+                                    <div className="flex flex-wrap gap-1">
+                                        {existingTags.length > 0 ? (
+                                            existingTags.map(tag => (
+                                                <button
+                                                    key={tag}
+                                                    type="button"
+                                                    onClick={() => !tags.includes(tag) && setTags([...tags, tag])}
+                                                    className={`px-2 py-1 text-[8px] font-bold rounded-lg border transition-all ${tags.includes(tag) ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-slate-50 border-slate-100 text-slate-400'}`}
+                                                >
+                                                    {tag}
+                                                </button>
+                                            ))
+                                        ) : (
+                                            <span className="text-[8px] text-slate-300">暂无标签</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* 快速添加新标签 */}
+                                <div className="flex gap-1.5">
+                                    <input type="text" value={currentTag} onChange={(e) => setCurrentTag(e.target.value)}
+                                        placeholder="新建标签"
+                                        className="flex-1 bg-slate-50 border border-slate-100 rounded-lg text-[10px] py-2 px-2 font-semibold outline-none focus:ring-1 focus:ring-blue-100"
+                                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())} />
+                                    <button type="button" onClick={() => addTag()} className="bg-blue-600 text-white p-2 rounded-lg shadow-md"><Plus size={14} /></button>
+                                </div>
+
+                                {/* 已选标签展示 */}
+                                {tags.length > 0 && (
+                                    <div className="flex flex-wrap gap-1">
+                                        {tags.map(tag => (
+                                            <span key={tag} className="bg-blue-50 text-blue-600 px-2 py-1 rounded-md text-[8px] font-bold flex items-center gap-1">
+                                                {tag} <X size={10} onClick={() => setTags(tags.filter(t=>t!==tag))} className="cursor-pointer" />
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
                             <label className="group flex flex-col items-center justify-center w-full max-w-sm aspect-square border-2 border-dashed border-slate-200 rounded-[2.5rem] bg-white hover:border-blue-400 cursor-pointer transition-all shadow-xl z-10 mx-4 active:scale-95">
                                 <input type="file" className="hidden" accept="image/*" capture="environment" onChange={handleImageUpload} />
                                 <div className="w-20 h-20 bg-blue-50 text-blue-500 rounded-3xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
@@ -318,7 +362,7 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
 
                     {imagePreview && (
                         // 关键修复：width/height full + object-contain 确保图片完全展示在区域内，不会溢出
-                        <div className={`relative w-full h-full flex items-center justify-center ${isCropping ? 'touch-none' : ''}`}>
+                        <div className={`relative w-full h-full flex flex-col items-center justify-center ${isCropping ? 'touch-none' : ''}`}>
                             {isCropping ? (
                                 <ReactCrop 
                                     crop={crop} 
@@ -337,11 +381,13 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
                                     />
                                 </ReactCrop>
                             ) : (
-                                <img 
-                                    src={imagePreview} 
-                                    className="max-h-full max-w-full object-contain rounded-xl shadow-lg border-2 border-white" 
-                                    alt="Preview" 
-                                />
+                                <div className="flex flex-col items-center justify-center gap-4 w-full h-full">
+                                    <img 
+                                        src={imagePreview} 
+                                        className="max-h-[calc(100%-120px)] max-w-full object-contain rounded-xl shadow-lg border-2 border-white" 
+                                        alt="Preview" 
+                                    />
+                                </div>
                             )}
                         </div>
                     )}
@@ -388,7 +434,7 @@ export const AddMistakeForm: React.FC<AddMistakeFormProps> = ({ onSave, onCancel
                                         <div className="p-3.5 rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-all shadow-sm"><CropIcon size={22}/></div>
                                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">裁剪</span>
                                     </button>
-                                    
+
                                     <Button size="lg" onClick={handleSaveInternal} isLoading={isProcessingImage} className="flex-1 h-14 rounded-[1.25rem] font-bold shadow-2xl shadow-blue-200 text-base tracking-tight">
                                         保存错题
                                     </Button>

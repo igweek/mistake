@@ -371,8 +371,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       </button>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto no-scrollbar">
-                      <div className="bg-slate-50 flex items-center justify-center p-6 border-b border-slate-100 min-h-[300px]">
+                  <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col">
+                      <div className="sticky top-0 z-20 bg-slate-50 flex items-center justify-center p-6 border-b border-slate-100 min-h-[300px] shrink-0">
                           {selectedAnalysisMistake.imageUrl ? (
                               <img src={selectedAnalysisMistake.imageUrl} className="max-w-full max-h-[50vh] object-contain rounded-xl shadow-lg border-4 border-white" alt="Question" />
                           ) : (
@@ -383,7 +383,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           )}
                       </div>
 
-                      <div className="p-8 md:p-12 relative">
+                      <div className="p-8 md:p-12 relative flex-1">
                           {analyzingIds.has(selectedAnalysisMistake.id) && (
                               <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center">
                                   <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 animate-bounce mb-4">

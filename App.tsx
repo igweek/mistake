@@ -513,6 +513,7 @@ const App: React.FC = () => {
             onSave={handleSaveMistake} 
             onCancel={() => { setEditingMistake(undefined); setView('dashboard'); }}
             existingTags={existingTags}
+            geminiApiKey={settings?.geminiApiKey}
           />
         )}
         {view === 'settings' && (
